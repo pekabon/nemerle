@@ -6,6 +6,7 @@ using Nemerle.Text;
 using Nemerle.WPF;
 
 using System;
+using System.ComponentModel;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -72,6 +73,16 @@ class SampleGrid : DependencyObject
     def control = d :> SampleGrid;
     control.Columns == 0 || control.Rows == 0
   }
+}
+
+[NotifyPropertyChanged]
+public class A
+{
+    [NotifyPropertyChangedIgnore]
+    A : string { get; set; }
+    
+    [NotifyPropertyChangedIgnore]
+    Prop1 : string { get; set; }
 }
 
 module Program

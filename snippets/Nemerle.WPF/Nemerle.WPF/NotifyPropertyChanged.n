@@ -1,0 +1,95 @@
+﻿using Nemerle;
+using Nemerle.Assertions;
+using Nemerle.Collections;
+using Nemerle.Compiler;
+using Nemerle.Compiler.Parsetree;
+using Nemerle.Compiler.Typedtree;
+using Nemerle.Text;
+using Nemerle.Utility;
+
+using System;
+using SCG = System.Collections.Generic;
+using System.Linq;
+using System.ComponentModel;
+
+namespace Nemerle.WPF
+{
+    [MacroUsage(MacroPhase.BeforeInheritance, MacroTargets.Class, Inherited = false, AllowMultiple = false)]  
+    public macro NotifyPropertyChanged(tb : TypeBuilder)
+    {
+        NotifyPropertyChangedHelper.ImplementInterface(tb);
+    }
+
+    [MacroUsage(MacroPhase.WithTypedMembers, MacroTargets.Class, Inherited = false, AllowMultiple = false)]  
+    public macro NotifyPropertyChanged(tb : TypeBuilder)
+    {
+        NotifyPropertyChangedHelper.FixProperties(tb);
+    }
+
+    [MacroUsage(MacroPhase.BeforeInheritance, MacroTargets.Property, Inherited = false, AllowMultiple = false)]  
+    public macro NotifyPropertyChangedIgnore(tb : TypeBuilder, property : ParsedProperty)
+    {
+        NotifyPropertyChangedHelper.RegisterIgnored(tb, property);
+    }
+
+    module NotifyPropertyChangedHelper
+    {       
+        public RegisterIgnored(tb : TypeBuilder, property : ClassMember.Property) : void
+        {
+            _ = _ignoredProperties.Add(tb, property.Name);
+        }      
+
+        public FixProperties(tb : TypeBuilder) : void
+        {
+            def ReportUsageError(type)
+            {
+                Message.Error(tb.Location, $"The NotifyPropertyChanged macro does not support a $(type).");
+            }
+
+            if (tb.IsDelegate)
+                ReportUsageError("delegate");
+            else if (tb.IsEnum)
+                ReportUsageError("enum");
+            else if (tb.IsInterface)
+                ReportUsageError("interface");
+            else if (tb.IsModule)
+                ReportUsageError("module");
+            else
+            {
+                def properties = tb.GetProperties().Filter(property => !_ignoredProperties.Contains(tb, property.Name));
+
+                foreach(property is PropertyBuilder in properties)
+                {
+                    def setter = (property.GetSetter() :> MethodBuilder);    
+                    when (setter != null)
+                    {
+                        setter.Body = <[$(setter.Body);
+                                        RaisePropertyChanged($(property.Name : string));]>;
+                    }
+                }
+            }
+        }
+
+        public ImplementInterface(tb : TypeBuilder) : void
+        {
+            assert2(false);
+
+            def eventDecl = <[decl: public event PropertyChanged : PropertyChangedEventHandler; ]>;
+
+            def raisePropertyChangedMethodDecl = <[ decl:
+                    protected RaisePropertyChanged(propertyName: string) : void
+                    {
+                        def handler = PropertyChanged;
+                        when (handler != null)
+                            handler(this, PropertyChangedEventArgs(propertyName));
+                    }
+                    ]>;
+
+            tb.Define(eventDecl);
+            tb.Define(raisePropertyChangedMethodDecl);
+            tb.AddImplementedInterface(<[INotifyPropertyChanged]>);
+        }
+
+        private _ignoredProperties = SCG.HashSet.[TypeBuilder * string]();
+    }
+}
