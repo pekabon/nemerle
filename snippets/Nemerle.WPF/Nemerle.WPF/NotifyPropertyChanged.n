@@ -25,11 +25,23 @@ namespace Nemerle.WPF
     {
         NotifyPropertyChangedHelper.FixProperties(tb);
     }
+    
+    public macro RaisePropertyChanged(expression : expr)
+    {
+        assert2(false);
+        <[]>
+    }
 
     [MacroUsage(MacroPhase.BeforeInheritance, MacroTargets.Property, Inherited = false, AllowMultiple = false)]  
     public macro NotifyPropertyChangedIgnore(tb : TypeBuilder, property : ParsedProperty)
     {
         NotifyPropertyChangedHelper.RegisterIgnored(tb, property);
+    }
+    
+    [MacroUsage(MacroPhase.BeforeInheritance, MacroTargets.Property, Inherited = false, AllowMultiple = false)]  
+    public macro DependentProperties(tb : TypeBuilder, property : ParsedProperty, params options : list[PExpr])
+    {
+        //NotifyPropertyChangedHelper.RegisterDependent(tb, property, options);
     }
 
     module NotifyPropertyChangedHelper
@@ -41,19 +53,11 @@ namespace Nemerle.WPF
 
         public FixProperties(tb : TypeBuilder) : void
         {
-            def ReportUsageError(type)
-            {
-                Message.Error(tb.Location, $"The NotifyPropertyChanged macro does not support a $(type).");
-            }
-
-            if (tb.IsDelegate)
-                ReportUsageError("delegate");
-            else if (tb.IsEnum)
-                ReportUsageError("enum");
-            else if (tb.IsInterface)
-                ReportUsageError("interface");
-            else if (tb.IsModule)
-                ReportUsageError("module");
+            if (tb.IsDelegate  || 
+                tb.IsEnum      || 
+                tb.IsInterface || 
+                tb.IsModule)
+                Message.Error(tb.Location, "Macro NotifyPropertyChanged is not valid on this declaration type. It is only valid on 'class' declarations.");
             else
             {
                 def properties = tb.GetProperties().Filter(property => !_ignoredProperties.Contains(tb, property.Name));
@@ -63,8 +67,10 @@ namespace Nemerle.WPF
                     def setter = (property.GetSetter() :> MethodBuilder);    
                     when (setter != null)
                     {
+                        def loc = setter.Body;
                         setter.Body = <[$(setter.Body);
-                                        RaisePropertyChanged($(property.Name : string));]>;
+                                        RaisePropertyChangedCore($(property.Name : string));]>;
+                        setter.Body = loc;
                     }
                 }
             }
@@ -73,11 +79,11 @@ namespace Nemerle.WPF
         public ImplementInterface(tb : TypeBuilder) : void
         {
             assert2(false);
-
+            
             def eventDecl = <[decl: public event PropertyChanged : PropertyChangedEventHandler; ]>;
 
             def raisePropertyChangedMethodDecl = <[ decl:
-                    protected RaisePropertyChanged(propertyName: string) : void
+                    protected RaisePropertyChangedCore(propertyName: string) : void
                     {
                         def handler = PropertyChanged;
                         when (handler != null)
