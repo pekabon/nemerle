@@ -6,6 +6,7 @@ using Nemerle.Text;
 using Nemerle.WPF;
 
 using System;
+using System.ComponentModel;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -17,109 +18,172 @@ using System.Console;
 
 class SampleGrid : DependencyObject
 {
-  // "value" parameter in Validate callback is typed (int)
-  [DependencyProperty(Validate = value => value >= 0,
+// "value" parameter in Validate callback is typed (int)
+    [DependencyProperty(Validate = value => value >= 0,
     Metadata = FrameworkPropertyMetadata(1, ColumnsRowsChangedCallback))]
-  // Explicitly access modifiers on accessors does not allowed on dependency properties:
-  // getter always like property access modifier, setter: like property or "private" when IsReadOnly specified
-  public Columns : int { get { } set { } }
+// Explicitly access modifiers on accessors does not allowed on dependency properties:
+// getter always like property access modifier, setter: like property or "private" when IsReadOnly specified
+    public Columns : int { get { } set { } }
 
-  // Short syntax for Validate callback
-  [DependencyProperty(Validate = value >= 0,
+// Short syntax for Validate callback
+    [DependencyProperty(Validate = value >= 0,
     Metadata = FrameworkPropertyMetadata(1, ColumnsRowsChangedCallback))]
-  public Rows : int { get { } set { } }
+    public Rows : int { get { } set { } }
 
-  // ReadOnly property
-  [DependencyProperty(IsReadOnly, Metadata = FrameworkPropertyMetadata(null, IsEmptyCoerceValueCallback))]
-  public IsEmpty : bool { get { } set { } }
+// ReadOnly property
+    [DependencyProperty(IsReadOnly, Metadata = FrameworkPropertyMetadata(null, IsEmptyCoerceValueCallback))]
+    public IsEmpty : bool { get { } set { } }
 
-  // Properties owning supported:
+// Properties owning supported:
 
-  [DependencyProperty(AddOwner : Control, Metadata = FrameworkPropertyMetadata(7d))]
-  public FontSize : double { get { } set { } }
+    [DependencyProperty(AddOwner : Control, Metadata = FrameworkPropertyMetadata(7d))]
+    public FontSize : double { get { } set { } }
 
-  // Qualified name, w/o metadata
-  [DependencyProperty(AddOwner : System.Windows.Controls.Control)]
-  public Background : Brush { get { } set { } }
+// Qualified name, w/o metadata
+    [DependencyProperty(AddOwner : System.Windows.Controls.Control)]
+    public Background : Brush { get { } set { } }
 
-  // Attached properties supported:
+// Attached properties supported:
 
-  // Test name of the validation method
-  [DependencyProperty(Validate = UntypedValidateCallback, Metadata = FrameworkPropertyMetadata(0))]
-  [AttachedPropertyBrowsableForTypeAttribute(typeof(Control))]
-  public static GetColumn(item : Control) : int;
+// Test name of the validation method
+    [DependencyProperty(Validate = UntypedValidateCallback, Metadata = FrameworkPropertyMetadata(0))]
+    [AttachedPropertyBrowsableForTypeAttribute(typeof(Control))]
+    public static GetColumn(item : Control) : int;
 
-  // Test qualified name of the validation method
-  [DependencyProperty(Validate = SampleGrid.TypedValidateCallback, Metadata = FrameworkPropertyMetadata(0))]
-  [AttachedPropertyBrowsableForTypeAttribute(typeof(Control))]
-  public static GetRow(item : Control) : int;
+// Test qualified name of the validation method
+    [DependencyProperty(Validate = SampleGrid.TypedValidateCallback, Metadata = FrameworkPropertyMetadata(0))]
+    [AttachedPropertyBrowsableForTypeAttribute(typeof(Control))]
+    public static GetRow(item : Control) : int;
 
-  private static UntypedValidateCallback(value : object) : bool {
-    | x is int => x >= 0
-    | _ => false
-  }
-  
-  private static TypedValidateCallback(value : int) : bool {
-    value >= 0
-  }
+    private static UntypedValidateCallback(value : object) : bool {
+        | x is int => x >= 0
+        | _ => false
+    }
 
-  private static ColumnsRowsChangedCallback([NotNull] d : DependencyObject, _ : DependencyPropertyChangedEventArgs) : void {
-    def control = d :> SampleGrid;
-    control.CoerceValue(IsEmptyProperty);
-  }
+    private static TypedValidateCallback(value : int) : bool {
+        value >= 0
+    }
 
-  private static IsEmptyCoerceValueCallback([NotNull] d : DependencyObject, _ : object) : object {
-    def control = d :> SampleGrid;
-    control.Columns == 0 || control.Rows == 0
-  }
+    private static ColumnsRowsChangedCallback([NotNull] d : DependencyObject, _ : DependencyPropertyChangedEventArgs) : void {
+        def control = d :> SampleGrid;
+        control.CoerceValue(IsEmptyProperty);
+    }
+
+    private static IsEmptyCoerceValueCallback([NotNull] d : DependencyObject, _ : object) : object {
+        def control = d :> SampleGrid;
+        control.Columns == 0 || control.Rows == 0
+    }
 }
+
+//[NotifyPropertyChanged]
+//public class A
+//{
+//    public Age       : int { get { DateTime.Today.Year - BirthDate.Year } }
+
+//    [IgnoreSelfChanges]
+//    [DependentProperties(Age, FullNameAndAge)]
+//    public BirthDate : DateTime { get; set; }
+    
+//    [DependentProperties(FullNameAndAge)]
+//    FirstName : string { get; set; }
+    
+//    [DependentProperties(FullNameAndAge)]
+//    LastName  : string { get; set; }
+    
+//    FullNameAndAge  : string { get { $"$FirstName $LastName $Age"} }
+    
+//    [NotifyPropertyChangedIgnore]
+//    IgnoredProperty : string { get; set; }
+    
+//    public Notify() : void
+//    {
+//        RaisePropertyChanged(BirthDate);
+//    }
+//}
+
+//[NotifyPropertyChanged]
+//public class B : A
+//{
+//    public NewProp : int { get; set; }
+    
+//    public Notify() : void
+//    {
+//        NewProp = 1;
+//    }
+//}
+
+//public class C : INotifyPropertyChanged
+//{
+//    public event PropertyChanged : PropertyChangedEventHandler;
+    
+//    public RaisePropChanged(propName : string) : void
+//    {
+//        def handler = PropertyChanged;
+//        when (handler != null)
+//         handler(this, PropertyChangedEventArgs(propertyName));
+//    }
+//}
+
+//[NotifyPropertyChanged(NotifyMethod=RaisePropChanged)]
+//public class D : C
+//{
+    
+//}
 
 module Program
 {
-  [STAThread]
-  Main() : void
-  {
-    def traceProperties = control => WriteLine($"Control: $(control.Columns) column(s), $(control.Rows) row(s), IsEmpty = $(control.IsEmpty)");
+    [STAThread]
+    Main() : void
+    {
+        TestDependencyProps();
+        
+        def a = A();
+        
+    }
+    
+    TestDependencyProps(): void
+    {
+        def traceProperties = control => WriteLine($"Control: $(control.Columns) column(s), $(control.Rows) row(s), IsEmpty = $(control.IsEmpty)");
 
-    def control = SampleGrid();
-    assert(control.Columns == 1);
-    assert(!control.IsEmpty);
-    traceProperties(control);
+        def control = SampleGrid();
+        assert(control.Columns == 1);
+        assert(!control.IsEmpty);
+        traceProperties(control);
 
     // Test "IsEmpty" read-only property and coerce value callback
 
-    control.Columns = 0;
-    assert(control.IsEmpty);
-    traceProperties(control);
+        control.Columns = 0;
+        assert(control.IsEmpty);
+        traceProperties(control);
 
-    control.Columns = 2;
-    control.Rows = 1;
-    traceProperties(control);
+        control.Columns = 2;
+        control.Rows = 1;
+        traceProperties(control);
 
     // Test attached properties
-    def traceAttached = (name, control) => WriteLine($"$name: Column = $(SampleGrid.GetColumn(control)), Row = $(SampleGrid.GetRow(control))");
+        def traceAttached = (name, control) => WriteLine($"$name: Column = $(SampleGrid.GetColumn(control)), Row = $(SampleGrid.GetRow(control))");
 
-    def left = Button();
-    assert(SampleGrid.GetColumn(left) == 0);
-    assert(SampleGrid.GetRow(left) == 0);
-    traceAttached("Left", left);
+        def left = Button();
+        assert(SampleGrid.GetColumn(left) == 0);
+        assert(SampleGrid.GetRow(left) == 0);
+        traceAttached("Left", left);
 
-    def right = Button();
-    assert(SampleGrid.GetColumn(right) == 0);
-    assert(SampleGrid.GetRow(right) == 0);
-    traceAttached("Right", right);
+        def right = Button();
+        assert(SampleGrid.GetColumn(right) == 0);
+        assert(SampleGrid.GetRow(right) == 0);
+        traceAttached("Right", right);
 
-    SampleGrid.SetColumn(right, 1);
-    assert(SampleGrid.GetColumn(right) == 1);
-    traceAttached("Right", right);
+        SampleGrid.SetColumn(right, 1);
+        assert(SampleGrid.GetColumn(right) == 1);
+        traceAttached("Right", right);
 
     // Test Validate callback
-    try {
-      // Causes a validation of invalid value
-      control.Rows = -1;
-    } catch {
-      // Report an exception about invalid value
-      | ex is ArgumentException => WriteLine(ex.Message)
+        try {
+    // Causes a validation of invalid value
+            control.Rows = -1;
+        } catch {
+    // Report an exception about invalid value
+            | ex is ArgumentException => WriteLine(ex.Message)
+        }
     }
-  }
 }

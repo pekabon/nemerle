@@ -1,0 +1,101 @@
+﻿using Nemerle;
+using Nemerle.Assertions;
+using Nemerle.Collections;
+using Nemerle.Compiler;
+using Nemerle.Compiler.Parsetree;
+using Nemerle.Compiler.Typedtree;
+using Nemerle.Text;
+using Nemerle.Utility;
+
+using System;
+using SCG = System.Collections.Generic;
+using System.Linq;
+using System.ComponentModel;
+
+namespace Nemerle.WPF
+{
+    [MacroUsage(MacroPhase.BeforeInheritance, MacroTargets.Class, Inherited = false, AllowMultiple = false)]  
+    public macro NotifyPropertyChanged(tb : TypeBuilder)
+    {
+        NotifyPropertyChangedHelper.ImplementInterface(tb);
+    }
+
+    [MacroUsage(MacroPhase.WithTypedMembers, MacroTargets.Class, Inherited = false, AllowMultiple = false)]  
+    public macro NotifyPropertyChanged(tb : TypeBuilder)
+    {
+        NotifyPropertyChangedHelper.FixProperties(tb);
+    }
+    
+    public macro RaisePropertyChanged(expression : expr)
+    {
+        assert2(false);
+        <[]>
+    }
+
+    [MacroUsage(MacroPhase.BeforeInheritance, MacroTargets.Property, Inherited = false, AllowMultiple = false)]  
+    public macro NotifyPropertyChangedIgnore(tb : TypeBuilder, property : ParsedProperty)
+    {
+        NotifyPropertyChangedHelper.RegisterIgnored(tb, property);
+    }
+    
+    [MacroUsage(MacroPhase.BeforeInheritance, MacroTargets.Property, Inherited = false, AllowMultiple = false)]  
+    public macro DependentProperties(tb : TypeBuilder, property : ParsedProperty, params options : list[PExpr])
+    {
+        //NotifyPropertyChangedHelper.RegisterDependent(tb, property, options);
+    }
+
+    module NotifyPropertyChangedHelper
+    {       
+        public RegisterIgnored(tb : TypeBuilder, property : ClassMember.Property) : void
+        {
+            _ = _ignoredProperties.Add(tb, property.Name);
+        }      
+
+        public FixProperties(tb : TypeBuilder) : void
+        {
+            if (tb.IsDelegate  || 
+                tb.IsEnum      || 
+                tb.IsInterface || 
+                tb.IsModule)
+                Message.Error(tb.Location, "Macro NotifyPropertyChanged is not valid on this declaration type. It is only valid on 'class' declarations.");
+            else
+            {
+                def properties = tb.GetProperties().Filter(property => !_ignoredProperties.Contains(tb, property.Name));
+
+                foreach(property is PropertyBuilder in properties)
+                {
+                    def setter = (property.GetSetter() :> MethodBuilder);    
+                    when (setter != null)
+                    {
+                        def loc = setter.Body;
+                        setter.Body = <[$(setter.Body);
+                                        RaisePropertyChangedCore($(property.Name : string));]>;
+                        setter.Body = loc;
+                    }
+                }
+            }
+        }
+
+        public ImplementInterface(tb : TypeBuilder) : void
+        {
+            assert2(false);
+            
+            def eventDecl = <[decl: public event PropertyChanged : PropertyChangedEventHandler; ]>;
+
+            def raisePropertyChangedMethodDecl = <[ decl:
+                    protected RaisePropertyChangedCore(propertyName: string) : void
+                    {
+                        def handler = PropertyChanged;
+                        when (handler != null)
+                            handler(this, PropertyChangedEventArgs(propertyName));
+                    }
+                    ]>;
+
+            tb.Define(eventDecl);
+            tb.Define(raisePropertyChangedMethodDecl);
+            tb.AddImplementedInterface(<[INotifyPropertyChanged]>);
+        }
+
+        private _ignoredProperties = SCG.HashSet.[TypeBuilder * string]();
+    }
+}
