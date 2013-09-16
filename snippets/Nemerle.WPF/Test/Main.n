@@ -75,60 +75,77 @@ class SampleGrid : DependencyObject
     }
 }
 
-//[NotifyPropertyChanged]
-//public class A
-//{
-//    public Age       : int { get { DateTime.Today.Year - BirthDate.Year } }
+[NotifyPropertyChanged]
+public class A
+{
+    public Age       : int { get { DateTime.Today.Year - BirthDate.Year } }
 
-//    [IgnoreSelfChanges]
-//    [DependentProperties(Age, FullNameAndAge)]
-//    public BirthDate : DateTime { get; set; }
+    //[NotifyChangedOptions(Dependent = [Age, FullNameAndAge], IgnoreSetter)]
+    public BirthDate : DateTime { get; set; }
     
-//    [DependentProperties(FullNameAndAge)]
-//    FirstName : string { get; set; }
+    //[NotifyChangedOptions(Dependent = FullNameAndAge)]
+    FirstName : string { get; set; }
     
-//    [DependentProperties(FullNameAndAge)]
-//    LastName  : string { get; set; }
+    //[NotifyChangedOptions(Dependent = FullNameAndAge)]
+    LastName  : string { get; set; }
     
-//    FullNameAndAge  : string { get { $"$FirstName $LastName $Age"} }
+    FullNameAndAge  : string { get { $"$FirstName $LastName $Age"} }
     
-//    [NotifyPropertyChangedIgnore]
-//    IgnoredProperty : string { get; set; }
+    //[NotifyChangedOptions(IgnoreSetter)]
+    IgnoredProperty : string { get; set; }
     
-//    public Notify() : void
-//    {
-//        RaisePropertyChanged(BirthDate);
-//    }
-//}
+    public Notify() : void
+    {
+        //RaisePropertyChanged(BirthDate);
+    }
+}
+
+//[NotifyPropertyChanged]
+//public delegate Foo() : void; //won't compile
 
 //[NotifyPropertyChanged]
 //public class B : A
 //{
 //    public NewProp : int { get; set; }
     
-//    public Notify() : void
+//    public new Notify() : void
 //    {
 //        NewProp = 1;
 //    }
 //}
 
-//public class C : INotifyPropertyChanged
-//{
-//    public event PropertyChanged : PropertyChangedEventHandler;
+public class C : INotifyPropertyChanged
+{
+    public event PropertyChanged : PropertyChangedEventHandler;
     
-//    public RaisePropChanged(propName : string) : void
-//    {
-//        def handler = PropertyChanged;
-//        when (handler != null)
-//         handler(this, PropertyChangedEventArgs(propertyName));
-//    }
-//}
+    protected RaisePropChanged(propName : string) : void
+    {
+        def handler = PropertyChanged;
+        when (handler != null)
+         handler(this, PropertyChangedEventArgs(propName));
+    }
+}
 
-//[NotifyPropertyChanged(NotifyMethod=RaisePropChanged)]
-//public class D : C
-//{
+public class D : C
+{
+    public NewProp : int { get; set; }
     
-//}
+    public new Notify() : void
+    {
+        //RaisePropertyChanged(NewProp, RaisePropChanged);
+    }
+}
+
+[NotifyPropertyChanged(RaisePropChanged)]
+public class D1 : C
+{
+    public NewProp : int { get; set; }
+    
+    public new Notify() : void
+    {
+        RaisePropertyChanged(NewProp);
+    }
+}
 
 module Program
 {
