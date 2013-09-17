@@ -84,19 +84,20 @@ public class A
     public BirthDate : DateTime { get; set; }
     
     //[NotifyChangedOptions(Dependent = FullNameAndAge)]
-    FirstName : string { get; set; }
+    public FirstName : string { get; set; }
     
     //[NotifyChangedOptions(Dependent = FullNameAndAge)]
-    LastName  : string { get; set; }
+    public LastName  : string { get; set; }
     
-    FullNameAndAge  : string { get { $"$FirstName $LastName $Age"} }
+    public FullNameAndAge  : string { get { $"$FirstName $LastName $Age"} }
     
     //[NotifyChangedOptions(IgnoreSetter)]
     IgnoredProperty : string { get; set; }
     
     public Notify() : void
     {
-        //RaisePropertyChanged(BirthDate);
+        RaisePropertyChanged(BirthDate);
+        //RaisePropertyChanged(BirthDate1); //won't compile
     }
 }
 
@@ -104,7 +105,7 @@ public class A
 //public delegate Foo() : void; //won't compile
 
 //[NotifyPropertyChanged]
-//public class B : A
+//public class B1 : A
 //{
 //    public NewProp : int { get; set; }
     
@@ -114,15 +115,33 @@ public class A
 //    }
 //}
 
+[NotifyPropertyChanged]
+public class B : A
+{
+    public NewProp : int { get; set; }
+    
+    public new Notify() : void
+    {
+        NewProp = 1;
+    }
+}
+
 public class C : INotifyPropertyChanged
 {
-    public event PropertyChanged : PropertyChangedEventHandler;
+    public NewProp : int { get; set; }
     
-    protected RaisePropChanged(propName : string) : void
+    public event PropertyChanged : PropertyChangedEventHandler;
+        
+    protected RaiseChanged(propName : string) : void
     {
         def handler = PropertyChanged;
         when (handler != null)
          handler(this, PropertyChangedEventArgs(propName));
+    }
+    
+    public new Notify() : void
+    {
+        RaisePropertyChanged(NewProp, RaiseChanged);
     }
 }
 
@@ -132,14 +151,14 @@ public class D : C
     
     public new Notify() : void
     {
-        //RaisePropertyChanged(NewProp, RaisePropChanged);
+        RaisePropertyChanged(NewProp, RaiseChanged);
     }
 }
 
-[NotifyPropertyChanged(RaisePropChanged)]
+[NotifyPropertyChanged(RaiseChanged)]
 public class D1 : C
 {
-    public NewProp : int { get; set; }
+    public NewPropD1 : int { get; set; }
     
     public new Notify() : void
     {
