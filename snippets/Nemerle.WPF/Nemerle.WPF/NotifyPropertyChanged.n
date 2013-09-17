@@ -36,7 +36,7 @@ namespace Nemerle.WPF
     {
         ignore(raisePropertyChangedMethod);
 
-        NotifyPropertyChangedHelper.FixProperties(tb);
+        NotifyPropertyChangedHelper.FixProperties(tb, macroName = GetName().Split(':')[0]);
     }
 
     public macro RaisePropertyChanged(expr, raisePropertyChangedMethod = <[ () ]>)
@@ -122,7 +122,7 @@ namespace Nemerle.WPF
             }
         }
 
-        public FixProperties(tb : TypeBuilder) : void
+        public FixProperties(tb : TypeBuilder, macroName : string) : void
         {
             assert2(false);
             
@@ -131,20 +131,24 @@ namespace Nemerle.WPF
             if(!FindRaisePropertyChangedMethod(tb, Some(raisePropertyChangedMethodName)))
             {
                 Message.Error(tb.Location, 
-                              "Specify a valid method for property changed event raising (e.g. [NotifyPropertyChanged(OnPropertyChanged)])");
+                              $"Specify a valid method for property changed event raising (e.g. [$macroName(OnPropertyChanged)])");
             }
             else
             {
-                def properties = tb.GetProperties().Filter(property => !_ignoredProperties.Contains(tb, property.Name));
+                def properties = tb.GetProperties(BindingFlags.DeclaredOnly | 
+                                                  BindingFlags.Instance     | 
+                                                  BindingFlags.Public       | 
+                                                  BindingFlags.NonPublic).
+                                    Filter(property => !_ignoredProperties.Contains(tb, property.Name));
 
-                foreach(property is PropertyBuilder in properties)
+                foreach(propertyBuilder is PropertyBuilder in properties)
                 {
-                    match(property.GetSetter())
+                    match(propertyBuilder.GetSetter())
                     {
                         | setter is MethodBuilder => 
                             def loc = setter.Body.Location;
                             setter.Body = <[ $(setter.Body);
-                                             $(raisePropertyChangedMethodName : name)($(property.Name : string)); ]>;
+                                             $(raisePropertyChangedMethodName : name)($(propertyBuilder.Name : string)); ]>;
                             setter.Body.Location = loc;
                         | _ => ()
                     }

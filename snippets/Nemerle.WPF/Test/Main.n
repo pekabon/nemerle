@@ -96,7 +96,7 @@ public class A
     
     public Notify() : void
     {
-        RaisePropertyChanged(BirthDate);
+        RaisePropertyChanged(IgnoredProperty);
         //RaisePropertyChanged(BirthDate1); //won't compile
     }
 }
