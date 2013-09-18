@@ -98,7 +98,8 @@ public class A
     {
         //RaisePropertyChanged(IgnoredProperty);
         //RaisePropertyChanged("test"+7); //error : Specify a property for changed event raising (e.g. RaisePropertyChanged(PropName)).
-        RaisePropertyChanged(BirthDate1); //error : Class 'A' does not contain a property with the name 'BirthDate1'.
+        //RaisePropertyChanged(BirthDate1); //error : Class 'A' does not contain a property with the name 'BirthDate1'.
+        RaisePropertyChanged(IgnoredProperty);
     }
 }
 
@@ -149,6 +150,8 @@ public class C : INotifyPropertyChanged
         
         //RaisePropertyChanged(NewProp); //error : Specify a valid method for property changed event raising (e.g. RaisePropertyChanged(PropName, OnPropertyChanged))
         
+        //RaisePropertyChanged(NewProp, RaiseChanged1);
+        
         //TODO: support multiple props in RaisePropertyChanged
         //RaisePropertyChanged([NewProp, NewProp1], RaiseChanged);
         // or 
@@ -166,7 +169,7 @@ public class D : C
     
     public new Notify() : void
     {
-        RaisePropertyChanged(NewProp, RaiseChanged);
+        //RaisePropertyChanged(NewProp, 3);
     }
 }
 

@@ -81,7 +81,10 @@ namespace Nemerle.WPF
             def raiseMethodName =  match(raisePropertyChangedMethod)
                                                     {
                                                         | <[ $(raisePropertyChangedMethodName : name) ]> => raisePropertyChangedMethodName
-                                                        | _ => Name("OnPropertyChanged")
+                                                        | <[()]> => Name("OnPropertyChanged")
+                                                        | _ =>  Message.Error(tb.Location, 
+                                                                $"Specify a valid method for property changed event raising (e.g. $macroName(PropName, OnPropertyChanged)).");
+                                                                Name("OnPropertyChanged")
                                                     };
 
             unless (interfaceAlreadyImplemented)
@@ -111,11 +114,11 @@ namespace Nemerle.WPF
                 <[]>
             }
                 
-            def CreateRaiseMethod(propName, raiseMethodName)
+            def CreateRaiseMethod(propName, methodNameLazy)
             {
                 match(tb.GetProperties().Filter(prop => prop.Name == propName))
                 {
-                   | [_] => raiseMethodName.Value.Map(raiseMethodName => <[ $(raiseMethodName : name)($(propName : string)); ]>) 
+                   | [_] => methodNameLazy.Value.Map(methodName => <[ $(methodName : name)($(propName : string)); ]>) 
                             ?? OnError($"Specify a valid method for property changed event raising (e.g. $macroName(PropName, OnPropertyChanged)).")
                    | []  => OnError($"Class '$(tb.FullName)' does not contain a property with the name '$propName'.")
                 }
@@ -125,10 +128,12 @@ namespace Nemerle.WPF
             {
                 match(raisePropertyChangedMethod)
                 {
-                    | <[ $(raiseMethodName : name) ]> => Some(raiseMethodName)
-                    | _ when tb.UserData.Contains(_userDataKey) => Some(tb.UserData[_userDataKey] :> Name)
-                    | _ => None()
-                }}
+                    | <[ $(raiseMethodName : name) ]>                with name = raiseMethodName
+                    | <[()]> when tb.UserData.Contains(_userDataKey) with name = tb.UserData[_userDataKey] :> Name
+                        => if (tb.MethodExists(name)) Some(name) else None()
+                    | _  => None()
+                }
+            }
             );
 
             match(property)
@@ -141,9 +146,9 @@ namespace Nemerle.WPF
 
         public FixProperties(tb : TypeBuilder, macroName : string) : void
         {
-            def raisePropertyChangedMethodName = tb.UserData[_userDataKey] :> Name;
+            def raiseMethodName = tb.UserData[_userDataKey] :> Name;
 
-            if(!MethodExists(tb, raisePropertyChangedMethodName))
+            if(!tb.MethodExists(raiseMethodName))
             {
                 Message.Error(tb.Location, 
                               $"Specify a valid method for property changed event raising (e.g. [$macroName(OnPropertyChanged)]).");
@@ -163,7 +168,7 @@ namespace Nemerle.WPF
                         | setter is MethodBuilder => 
                             def loc = setter.Body.Location;
                             setter.Body = <[ $(setter.Body);
-                                            $(raisePropertyChangedMethodName : name)($(propertyBuilder.Name : string)); ]>;
+                                            $(raiseMethodName : name)($(propertyBuilder.Name : string)); ]>;
                             setter.Body.Location = loc;
                         | _ => ()
                     }
@@ -180,8 +185,8 @@ namespace Nemerle.WPF
         {
             decoratedMacroName.Split(':').First()
         }
-
-        private MethodExists(tb : TypeBuilder, raisePropertyChangedMethodName : Name) : bool
+        
+        private MethodExists(this tb : TypeBuilder, raisePropertyChangedMethodName : Name) : bool
         {
             tb.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).
                                          Exists(method => method.Name == raisePropertyChangedMethodName.Id)
