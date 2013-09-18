@@ -76,6 +76,7 @@ class SampleGrid : DependencyObject
 }
 
 [NotifyPropertyChanged]
+//[NotifyPropertyChanged("Method")] //error : Specify a valid method for property changed event raising (e.g. NotifyPropertyChanged(PropName, OnPropertyChanged))
 public class A
 {
     public Age       : int { get { DateTime.Today.Year - BirthDate.Year } }
@@ -91,15 +92,16 @@ public class A
     
     public FullNameAndAge  : string { get { $"$FirstName $LastName $Age"} }
     
-    //[NotifyChangedOptions(IgnoreSetter)]
-    IgnoredProperty : string { get; set; }
+    [NotifyChangedOptions(IgnoreSetter)]
+    //[NotifyChangedOptions(IgnoreSetter1)] //error : Unsupported argument 'IgnoreSetter1' in NotifyChangedOptions macro, valid options are: 'Dependent = [Prop1, Prop2]' and 'IgnoreSetter'
+    public IgnoredProperty : string { get; set; }
     
     public Notify() : void
     {
-        //RaisePropertyChanged(IgnoredProperty);
+        RaisePropertyChanged(IgnoredProperty);
         //RaisePropertyChanged("test"+7); //error : Specify a property for changed event raising (e.g. RaisePropertyChanged(PropName)).
         //RaisePropertyChanged(BirthDate1); //error : Class 'A' does not contain a property with the name 'BirthDate1'.
-        RaisePropertyChanged(IgnoredProperty);
+        //RaisePropertyChanged(IgnoredProperty, Raise); //error : Specify a valid method for property changed event raising (e.g. RaisePropertyChanged(PropName, OnPropertyChanged)).
     }
 }
 

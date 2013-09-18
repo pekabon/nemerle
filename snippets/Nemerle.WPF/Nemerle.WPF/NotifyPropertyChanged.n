@@ -17,42 +17,44 @@ namespace Nemerle.WPF
     using NotifyPropertyChangedHelper;
 
     [MacroUsage(MacroPhase.BeforeInheritance, MacroTargets.Class, Inherited = false, AllowMultiple = false)]  
-    public macro NotifyPropertyChanged(tb : TypeBuilder, raisePropertyChangedMethod = null)
+    public macro NotifyPropertyChanged(tb : TypeBuilder, raiseChangedMethod = null)
     {
-        ignore(raisePropertyChangedMethod);
+        ignore(raiseChangedMethod);
 
         AddInterface(tb);
     }
 
     [MacroUsage(MacroPhase.BeforeTypedMembers, MacroTargets.Class, Inherited = false, AllowMultiple = false)]  
-    public macro NotifyPropertyChanged(tb : TypeBuilder, raisePropertyChangedMethod = <[ () ]>)
+    public macro NotifyPropertyChanged(tb : TypeBuilder, raiseChangedMethod = <[ () ]>)
     {
-        ImplementInterface(Macros.ImplicitCTX(), 
-                           tb, 
-                           raisePropertyChangedMethod,
-                           GetName() |> UndecorateMacroName);
+        ImplementInterface(Macros.ImplicitCTX(), tb, raiseChangedMethod, GetUndecoratedName());
     }
 
     [MacroUsage(MacroPhase.WithTypedMembers, MacroTargets.Class, Inherited = false, AllowMultiple = false)]  
-    public macro NotifyPropertyChanged(tb : TypeBuilder, raisePropertyChangedMethod =  <[ () ]>)
+    public macro NotifyPropertyChanged(tb : TypeBuilder, raiseChangedMethod =  <[ () ]>)
     {
-        ignore(raisePropertyChangedMethod);
+        ignore(raiseChangedMethod);
 
-        FixProperties(tb, GetName() |> UndecorateMacroName);
+        FixProperties(tb, GetUndecoratedName());
     }
 
-    public macro RaisePropertyChanged(property : PExpr, raisePropertyChangedMethod = <[ () ]>)
+    public macro RaisePropertyChanged(property : PExpr, raiseChangedMethod = <[ () ]>)
     {
         RaisePropertyChanged(Macros.ImplicitCTX().CurrentTypeBuilder,
                              property,
-                             raisePropertyChangedMethod,
-                             GetName() |> UndecorateMacroName);
+                             raiseChangedMethod,
+                             GetUndecoratedName());
     }
 
     [MacroUsage(MacroPhase.BeforeInheritance, MacroTargets.Property, Inherited = false, AllowMultiple = false)]  
-    public macro NotifyPropertyChangedIgnore(tb : TypeBuilder, property : ParsedProperty)
+    public macro NotifyChangedOptions(tb : TypeBuilder, property : ParsedProperty, params options : list[PExpr])
     {
-        RegisterIgnored(tb, property);
+        foreach(option in options) 
+        {
+            | <[ IgnoreSetter ]> => RegisterIgnored(tb, property);
+            | e => Message.Error(e.Location, 
+                                 $"Unsupported argument '$e' in $(GetUndecoratedName()) macro, valid options are: 'Dependent = [Prop1, Prop2]' and 'IgnoreSetter'.")
+        }
     }
 
     module NotifyPropertyChangedHelper
@@ -62,10 +64,10 @@ namespace Nemerle.WPF
             tb.AddImplementedInterface(<[ System.ComponentModel.INotifyPropertyChanged ]>);
         }
 
-        public ImplementInterface(typer                    : Typer, 
-                                tb                         : TypeBuilder, 
-                                raisePropertyChangedMethod : PExpr, 
-                                macroName                  : string) : void
+        public ImplementInterface(typer            : Typer, 
+                                tb                 : TypeBuilder, 
+                                raiseChangedMethod : PExpr, 
+                                macroName          : string) : void
         {
             Macros.DefineCTX(typer);
 
@@ -78,77 +80,72 @@ namespace Nemerle.WPF
 
             def interfaceAlreadyImplemented = tb.BaseClass.TryRequire(<[ ttype: System.ComponentModel.INotifyPropertyChanged ]>);
 
-            def raiseMethodName =  match(raisePropertyChangedMethod)
-                                                    {
-                                                        | <[ $(raisePropertyChangedMethodName : name) ]> => raisePropertyChangedMethodName
-                                                        | <[()]> => Name("OnPropertyChanged")
-                                                        | _ =>  Message.Error(tb.Location, 
-                                                                $"Specify a valid method for property changed event raising (e.g. $macroName(PropName, OnPropertyChanged)).");
-                                                                Name("OnPropertyChanged")
-                                                    };
+            def raiseChangedMethodName = match(raiseChangedMethod)
+                                         {
+                                             | <[ $(methodName : name) ]> => methodName
+                                             | <[()]> => Name("OnPropertyChanged")
+                                             | _ =>  Message.Error(tb.Location, 
+                                                                   $"Specify a valid method for property changed event raising (e.g. $macroName(PropName, OnPropertyChanged)).");
+                                                     Name("OnPropertyChanged")
+                                         };
 
             unless (interfaceAlreadyImplemented)
             {
                 tb.Define(<[ decl: public event PropertyChanged : System.ComponentModel.PropertyChangedEventHandler; ]>);
 
                 def raiseMethodDecl = <[ decl:
-                                    protected virtual $(raiseMethodName : name)(propertyName: string) : void
-                                    {
-                                        def handler = PropertyChanged;
-                                        when (handler != null)
-                                            handler(this, System.ComponentModel.PropertyChangedEventArgs(propertyName));
-                                    }
-                            ]>;
+                                         protected virtual $(raiseChangedMethodName : name)(propertyName: string) : void
+                                         {
+                                             def handler = PropertyChanged;
+                                             when (handler != null)
+                                                 handler(this, System.ComponentModel.PropertyChangedEventArgs(propertyName));
+                                         }
+                                        ]>;
 
                 tb.Define(raiseMethodDecl);
             }
 
-            tb.UserData[_userDataKey] = raiseMethodName;
+            tb.UserData[_userDataKey] = raiseChangedMethodName;
         }
 
-        public RaisePropertyChanged(tb : TypeBuilder, property : PExpr, raisePropertyChangedMethod : PExpr, macroName : string) : PExpr
+        public RaisePropertyChanged(tb : TypeBuilder, property : PExpr, raiseChangedMethod : PExpr, macroName : string) : PExpr
         {
             def OnError(message)
             {
-                Message.Error(raisePropertyChangedMethod.Location, message);
+                Message.Error(raiseChangedMethod.Location, message);
                 <[]>
             }
                 
-            def CreateRaiseMethod(propName, methodNameLazy)
+            def CreateRaiseMethod(propName, raiseChangedMethodName : option[Name])
             {
                 match(tb.GetProperties().Filter(prop => prop.Name == propName))
                 {
-                   | [_] => methodNameLazy.Value.Map(methodName => <[ $(methodName : name)($(propName : string)); ]>) 
+                   | [_] => raiseChangedMethodName.Map(methodName => <[ $(methodName : name)($(propName : string)); ]>) 
                             ?? OnError($"Specify a valid method for property changed event raising (e.g. $macroName(PropName, OnPropertyChanged)).")
                    | []  => OnError($"Class '$(tb.FullName)' does not contain a property with the name '$propName'.")
                 }
             }
 
-            def methodName = lazy(
-            {
-                match(raisePropertyChangedMethod)
-                {
-                    | <[ $(raiseMethodName : name) ]>                with name = raiseMethodName
-                    | <[()]> when tb.UserData.Contains(_userDataKey) with name = tb.UserData[_userDataKey] :> Name
-                        => if (tb.MethodExists(name)) Some(name) else None()
-                    | _  => None()
-                }
-            }
-            );
+            def raiseChangedMethodName = match(raiseChangedMethod)
+                             {
+                                 | <[ $(methodName : name) ]> with name = methodName
+                                 | <[()]> when tb.UserData.Contains(_userDataKey) with name = tb.UserData[_userDataKey] :> Name
+                                      => if (tb.MethodExists(name)) Some(name) else None()
+                                 | _  => None()
+                             };
 
             match(property)
             {
-                | propExpr is PExpr.Ref with propName = propExpr.name.Id => 
-                        CreateRaiseMethod(propName, methodName)
+                | propExpr is PExpr.Ref => CreateRaiseMethod(propExpr.name.Id, raiseChangedMethodName)
                 | _ => OnError($"Specify a property for changed event raising (e.g. $macroName(PropName)).")
             }
         }
 
         public FixProperties(tb : TypeBuilder, macroName : string) : void
         {
-            def raiseMethodName = tb.UserData[_userDataKey] :> Name;
+            def raiseChangedMethodName = tb.UserData[_userDataKey] :> Name;
 
-            if(!tb.MethodExists(raiseMethodName))
+            if(!tb.MethodExists(raiseChangedMethodName))
             {
                 Message.Error(tb.Location, 
                               $"Specify a valid method for property changed event raising (e.g. [$macroName(OnPropertyChanged)]).");
@@ -168,7 +165,7 @@ namespace Nemerle.WPF
                         | setter is MethodBuilder => 
                             def loc = setter.Body.Location;
                             setter.Body = <[ $(setter.Body);
-                                            $(raiseMethodName : name)($(propertyBuilder.Name : string)); ]>;
+                                            $(raiseChangedMethodName : name)($(propertyBuilder.Name : string)); ]>;
                             setter.Body.Location = loc;
                         | _ => ()
                     }
@@ -180,17 +177,16 @@ namespace Nemerle.WPF
         {
             _ = _ignoredProperties.Add(tb, property.Name);
         }
-
-        public UndecorateMacroName(decoratedMacroName : string) : string
-        {
-            decoratedMacroName.Split(':').First()
-        }
         
-        private MethodExists(this tb : TypeBuilder, raisePropertyChangedMethodName : Name) : bool
+        public GetUndecoratedName(this macroInstance : IMacro) : string
+        {
+            macroInstance.GetName().Split(':').First()
+        }
+
+        private MethodExists(this tb : TypeBuilder, methodName : Name) : bool
         {
             tb.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).
-                                         Exists(method => method.Name == raisePropertyChangedMethodName.Id)
-            
+               Exists(method => method.Name == methodName.Id)
         }
 
         private _ignoredProperties = SCG.HashSet.[TypeBuilder * string]();
