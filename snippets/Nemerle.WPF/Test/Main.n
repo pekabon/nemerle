@@ -96,13 +96,14 @@ public class A
     
     public Notify() : void
     {
-        RaisePropertyChanged(IgnoredProperty);
-        //RaisePropertyChanged(BirthDate1); //won't compile
+        //RaisePropertyChanged(IgnoredProperty);
+        //RaisePropertyChanged("test"+7); //error : Specify a property for changed event raising (e.g. RaisePropertyChanged(PropName)).
+        RaisePropertyChanged(BirthDate1); //error : Class 'A' does not contain a property with the name 'BirthDate1'.
     }
 }
 
 //[NotifyPropertyChanged]
-//public delegate Foo() : void; //won't compile
+//public delegate Foo() : void; //won't compile (error : Macro NotifyPropertyChanged is not valid on this declaration type. It is only valid on 'class' declarations.)
 
 //[NotifyPropertyChanged]
 //public class B1 : A
@@ -145,6 +146,8 @@ public class C : INotifyPropertyChanged
     public new Notify() : void
     {
         RaisePropertyChanged(NewProp, RaiseChanged);
+        
+        //RaisePropertyChanged(NewProp); //error : Specify a valid method for property changed event raising (e.g. RaisePropertyChanged(PropName, OnPropertyChanged))
         
         //TODO: support multiple props in RaisePropertyChanged
         //RaisePropertyChanged([NewProp, NewProp1], RaiseChanged);
