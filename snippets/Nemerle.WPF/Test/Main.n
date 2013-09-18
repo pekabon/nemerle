@@ -126,9 +126,12 @@ public class B : A
     }
 }
 
+//TODO: support custom INPC implementation
+//[NotifyPropertyChanged(RaiseChanged)]
 public class C : INotifyPropertyChanged
 {
     public NewProp : int { get; set; }
+    public NewProp1 : int { get; set; }
     
     public event PropertyChanged : PropertyChangedEventHandler;
         
@@ -142,6 +145,15 @@ public class C : INotifyPropertyChanged
     public new Notify() : void
     {
         RaisePropertyChanged(NewProp, RaiseChanged);
+        
+        //TODO: support multiple props in RaisePropertyChanged
+        //RaisePropertyChanged([NewProp, NewProp1], RaiseChanged);
+        // or 
+        //RaisePropertiesChanged([NewProp, NewProp1], RaiseChanged);
+        
+        //TODO: support custom raise all props changed
+        //RaiseAllPropertiesChanged(RaiseChanged);
+        //RaiseAllPropertiesChanged(RaiseChanged, IncludeInherited);
     }
 }
 
