@@ -66,10 +66,10 @@ namespace Nemerle.WPF
         {
             Macros.DefineCTX(typer);
 
-            when (tb.IsDelegate  || 
-                  tb.IsEnum      || 
-                  tb.IsInterface || 
-                  tb.IsModule)
+            when(tb.IsDelegate  || 
+                 tb.IsEnum      || 
+                 tb.IsInterface || 
+                 tb.IsModule)
                 Message.Error(tb.Location, 
                               $"Macro $macroName is not valid on this declaration type. It is only valid on 'class' declarations.");
 
@@ -80,8 +80,8 @@ namespace Nemerle.WPF
                                              | <[ $(methodName : name) ]> => methodName
                                              | <[()]> => Name("OnPropertyChanged")
                                              | _ =>  Message.Error(tb.Location, 
-                                                                   $"Specify a valid method for property changed event raising (e.g. $macroName(PropName, OnPropertyChanged)).");
-                                                     Name("OnPropertyChanged")
+                                                                $"Specify a valid method for property changed event raising (e.g. $macroName(OnPropertyChanged)).");
+                                                    Name("OnPropertyChanged")
                                          };
 
             unless (interfaceAlreadyImplemented)
@@ -109,14 +109,15 @@ namespace Nemerle.WPF
                 Message.Error(raiseChangedMethod.Location, message);
                 <[]>
             }
-                
+
             def GetRaiseChangedMethodCall(propName, raiseChangedMethodName : option[Name])
             {
                 match(tb.GetProperties().Filter(prop => prop.Name == propName))
                 {
-                   | _::_ => raiseChangedMethodName.Map(methodName => <[ $(methodName : name)($(propName : string)); ]>) 
+                   | [_] => raiseChangedMethodName.Map(methodName => <[ $(methodName : name)($(propName : string)); ]>) 
                             ?? OnError($"Specify a valid method for property changed event raising (e.g. $macroName(PropName, OnPropertyChanged)).")
                    | []  => OnError($"Class '$(tb.FullName)' does not contain a property with the name '$propName'.")
+                   | _::_ => assert(false, $"two or more properties with the same name found ($propName).")
                 }
             }
 
@@ -139,20 +140,41 @@ namespace Nemerle.WPF
 
         public FixProperties(tb : TypeBuilder, macroName : string) : void
         {
-            def CreateRaiseChangedMethodCalls(raiseChangedMethodName, propertyName : string)
+            def GetDependentProps(tb, propertyName)
+            {
+                if(!tb.UserData.Contains((_dependentPropsKey, propertyName)))
+                    []
+                else
+                    tb.UserData[(_dependentPropsKey, propertyName)] :> list[PExpr]
+            }
+            
+            def ValidateDependentProps(dependentProps)
+            {
+                foreach(dependentProp in dependentProps)
+                {
+                    unless(tb.GetProperties().Exists(prop => prop.Name == dependentProp.ToString()))
+                        Message.Error(dependentProp.Location, 
+                            $"Class '$(tb.FullName)' does not contain a property with the name '$dependentProp'.")
+                }
+            }
+            
+            def GetRaiseChangedMethodCalls(methodName, propertyName)
             {
                 def dependentProps = GetDependentProps(tb, propertyName);
                 
-                //dependentProps.Map(property => <[ $(raiseChangedMethodName : name)($((property :> PExpr.Ref).Name.Id) : string); ]>)
-                //unless(_ignoredProperties.Contains(tb, propertyName) || )
-                //{
-                    
-                //}
-                [<[]>]
+                ValidateDependentProps(dependentProps);
+                
+                def selfSetterRaising = 
+                    if(_ignoredProperties.Contains(tb, propertyName))
+                        <[]>
+                    else 
+                        <[ $(methodName : name)($(propertyName : string)); ]>;
+
+                selfSetterRaising :: dependentProps.Map(prop => <[ $(methodName : name)($(prop.ToString() : string)) ]>)
             }
-            
+
             def raiseChangedMethodName = GetRaiseChangedMethodName(tb);
-            
+
             if(!tb.MethodExists(raiseChangedMethodName))
             {
                 Message.Error(tb.Location, 
@@ -163,37 +185,39 @@ namespace Nemerle.WPF
                 def properties = tb.GetProperties(BindingFlags.DeclaredOnly | 
                                                   BindingFlags.Instance     | 
                                                   BindingFlags.Public       | 
-                                                  BindingFlags.NonPublic)/*.
-                                    Filter(property => !_ignoredProperties.Contains(tb, property.Name))*/;
+                                                  BindingFlags.NonPublic);
 
                 foreach(propertyBuilder is PropertyBuilder in properties)
                 {
-                    match(propertyBuilder.GetSetter())
+                    match(propertyBuilder.Setter)
                     {
                         | setter is MethodBuilder => 
-                            //def loc = setter.Body.Location;
-                            def raiseChangedMethodCalls = CreateRaiseChangedMethodCalls(raiseChangedMethodName, propertyBuilder.Name);
                             setter.Body = <[ $(setter.Body);
-                                             ..$raiseChangedMethodCalls; ]>;
-                            //setter.Body.Location = loc;
+                                            ..$(GetRaiseChangedMethodCalls(raiseChangedMethodName, propertyBuilder.Name)); ]>;
                         | _ => ()
                     }
                 }
             }
         }
-        
+
         public SetOptions(tb : TypeBuilder, property : ClassMember.Property, macroName : string, options : list[PExpr]) : void
         {
-            assert2(false);
+            def SetDependentProps(tb, propName, dependentProps)
+            {
+                tb.UserData[(_dependentPropsKey, propName)] = dependentProps
+            }
             
+            unless(property.setter.HasValue)
+                Message.Warning($"$macroName macro ignored on property without a setter.");
+
             foreach(option in options) 
             {
-                | <[ IgnoreSetter ]>           => _ = _ignoredProperties.Add(tb, property.Name);
+                | <[ HideSelfChanges ]>           => _ = _ignoredProperties.Add(tb, property.Name);
                 | <[ Dependent = $prop ]> when options is [_] 
                                           with props = [prop]
-                | <[ Dependent = [..$props] ]> => SetDependentProps(tb, property.Name, props)
+                | <[ Dependent = [..$props] ]>    => SetDependentProps(tb, property.Name, props)
                 | e => Message.Error(e.Location, 
-                                     $"Invalid options syntax in $macroName macro, valid options are: 'Dependent = [Prop1, Prop2]' and 'IgnoreSetter'.")
+                                        $"Invalid options syntax in $macroName macro, valid options are: 'Dependent = [Prop1, Prop2]' and 'HideSelfChanges'.")
             }
         }
 
@@ -207,34 +231,20 @@ namespace Nemerle.WPF
             tb.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).
                Exists(method => method.Name == methodName.Id)
         }
-        
+
         private GetRaiseChangedMethodName(tb : TypeBuilder) : Name
         {
             assert(tb.UserData.Contains(_raiseChangedMethodKey));
-            
+
             tb.UserData[_raiseChangedMethodKey] :> Name
         }
-        
+
         private SetRaiseChangedMethodName(tb : TypeBuilder, raiseChangedMethodName : Name) : void
         {
             tb.UserData[_raiseChangedMethodKey] = raiseChangedMethodName
         }
-        
-        private SetDependentProps(tb : TypeBuilder, propertyName : string, dependentProps : list[PExpr]) : void
-        {
-            tb.UserData[(_dependentPropsKey, propertyName)] = dependentProps
-        }
-        
-        private GetDependentProps(tb : TypeBuilder, propertyName : string) : list[PExpr]
-        {
-            if(!tb.UserData.Contains((_dependentPropsKey, propertyName)))
-                []
-            else
-                tb.UserData[(_dependentPropsKey, propertyName)] :> list[PExpr]
-        }
-        
+
         private _ignoredProperties     = SCG.HashSet.[TypeBuilder * string]();
-        private _ignoredPropsKey       = Guid.NewGuid();
         private _dependentPropsKey     = Guid.NewGuid();
         private _raiseChangedMethodKey = Guid.NewGuid();
     }
