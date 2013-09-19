@@ -81,10 +81,11 @@ public class A
 {
     public Age       : int { get { DateTime.Today.Year - BirthDate.Year } }
 
-    //[NotifyChangedOptions(Dependent = [Age, FullNameAndAge], IgnoreSetter)]
+    [NotifyChangedOptions(Dependent = [Age, FullNameAndAge], IgnoreSetter)]
     public BirthDate : DateTime { get; set; }
     
-    //[NotifyChangedOptions(Dependent = FullNameAndAge)]
+    [NotifyChangedOptions(Dependent = FullNameAndAge)]
+    //[NotifyChangedOptions(Dependent = FullNameAndAge, IgnoreSetter)]//error : Invalid options syntax in NotifyChangedOptions macro, valid options are: 'Dependent = [Prop1, Prop2]' and 'IgnoreSetter'.
     public FirstName : string { get; set; }
     
     //[NotifyChangedOptions(Dependent = FullNameAndAge)]
@@ -93,7 +94,7 @@ public class A
     public FullNameAndAge  : string { get { $"$FirstName $LastName $Age"} }
     
     [NotifyChangedOptions(IgnoreSetter)]
-    //[NotifyChangedOptions(IgnoreSetter1)] //error : Unsupported argument 'IgnoreSetter1' in NotifyChangedOptions macro, valid options are: 'Dependent = [Prop1, Prop2]' and 'IgnoreSetter'
+    //[NotifyChangedOptions(IgnoreSetter1)] //error : Invalid options syntax in NotifyChangedOptions macro, valid options are: 'Dependent = [Prop1, Prop2]' and 'IgnoreSetter'.
     public IgnoredProperty : string { get; set; }
     
     public Notify() : void
