@@ -20,22 +20,32 @@ namespace Nemerle.WPF
     public macro NotifyPropertyChanged(tb : TypeBuilder, raiseChangedMethod = null)
     {
         ignore(raiseChangedMethod);
-
-        AddInterface(tb);
+        
+        if(!tb.TrySetMacroAttributeSpecified(this))
+        {
+            Message.Error(tb.Location, 
+                            $"Duplicates of macro $(GetMacroName()) are not allowed.");
+        }
+        else
+        {
+            AddInterface(tb);
+        }
     }
 
     [MacroUsage(MacroPhase.BeforeTypedMembers, MacroTargets.Class, Inherited = false, AllowMultiple = false)]  
     public macro NotifyPropertyChanged(tb : TypeBuilder, raiseChangedMethod = <[ () ]>)
     {
-        ImplementInterface(Macros.ImplicitCTX(), tb, raiseChangedMethod, GetMacroName());
+        when(tb.TrySetMacroAttributeSpecified(this))
+            ImplementInterface(Macros.ImplicitCTX(), tb, raiseChangedMethod, GetMacroName());
     }
 
     [MacroUsage(MacroPhase.WithTypedMembers, MacroTargets.Class, Inherited = false, AllowMultiple = false)]  
     public macro NotifyPropertyChanged(tb : TypeBuilder, raiseChangedMethod =  null)
     {
         ignore(raiseChangedMethod);
-
-        FixProperties(tb, GetMacroName());
+        
+        when(tb.TrySetMacroAttributeSpecified(this))
+            FixProperties(tb, GetMacroName());
     }
 
     public macro RaisePropertyChanged(property : PExpr, raiseChangedMethod = <[ () ]>)
@@ -79,7 +89,7 @@ namespace Nemerle.WPF
                                          {
                                              | <[ $(methodName : name) ]> => methodName
                                              | <[()]> => Name("OnPropertyChanged")
-                                             | _ =>  Message.Error(tb.Location, 
+                                             | e =>  Message.Error(e.Location, 
                                                                 $"Specify a valid method for property changed event raising (e.g. $macroName(OnPropertyChanged)).");
                                                     Name("OnPropertyChanged")
                                          };
@@ -224,6 +234,19 @@ namespace Nemerle.WPF
         public GetMacroName(this macroInstance : IMacro) : string
         {
             macroInstance.GetName().Split(':').First()
+        }
+        
+        public TrySetMacroAttributeSpecified(this tb : TypeBuilder, macroInstance : IMacro) : bool
+        {
+            if(tb.UserData.Contains(macroInstance.GetType().GUID))
+            {
+                false
+            }
+            else
+            {
+                _ = tb.UserData[macroInstance.GetType().GUID];
+                true
+            }
         }
 
         private MethodExists(this tb : TypeBuilder, methodName : Name) : bool
